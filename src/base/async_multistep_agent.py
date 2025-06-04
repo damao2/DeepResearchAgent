@@ -407,8 +407,8 @@ You have been provided with these additional arguments, that you can access usin
                 memory_step, agent=self
             )
 
-    def _handle_max_steps_reached(self, task: str, images: list["PIL.Image.Image"], step_start_time: float) -> Any:
-        final_answer = self.provide_final_answer(task, images)
+    async def _handle_max_steps_reached(self, task: str, images: list["PIL.Image.Image"], step_start_time: float) -> Any:
+        final_answer = await self.provide_final_answer(task, images)
         final_memory_step = ActionStep(
             step_number=self.step_number, error=AgentMaxStepsError("Reached max steps.", self.logger)
         )

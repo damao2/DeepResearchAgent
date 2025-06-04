@@ -9,8 +9,8 @@ load_dotenv(verbose=True)
 from src.utils import assemble_project_path
 
 class SearcherToolConfig(BaseModel):
-    engine: str = Field(default="Google", description="Search engine the llm to use")
-    fallback_engines: List[str] = Field(default_factory=lambda: ["DuckDuckGo", "Baidu", "Bing"], description="Fallback search engines to try if the primary engine fails")
+    engine: str = Field(default="Bing", description="Search engine the llm to use")
+    fallback_engines: List[str] = Field(default_factory=lambda: ["Baidu","DuckDuckGo" , "Google"], description="Fallback search engines to try if the primary engine fails")
     retry_delay: int = Field(default=10, description="Seconds to wait before retrying all engines again after they all fail")
     max_retries: int = Field(default=3, description="Maximum number of times to retry all engines when all fail")
     lang: str = Field(default="en", description="Language code for search results (e.g., en, zh, fr)")
@@ -21,14 +21,15 @@ class SearcherToolConfig(BaseModel):
     max_length: int = Field(default=50000, description="Maximum character length for the content to be fetched")
 
 class DeepResearcherToolConfig(BaseModel):
-    model_id: str = Field(default="claude-4-sonnet", description="Model ID for the LLM to use")
+    model_id: str = Field(default="Qwen2.5-72B-Instruct", description="Model ID for the LLM to use")
     max_depth: int = Field(default=2, description="Maximum depth for the search")
     max_insights: int = Field(default=20, description="Maximum number of insights to extract")
     time_limit_seconds: int = Field(default=60, description="Time limit for the search in seconds")
     max_follow_ups: int = Field(default=3, description="Maximum number of follow-up questions to ask")
 
 class BrowserToolConfig(BaseModel):
-    model_id: str = Field(default="langchain-gpt-4.1", description="Model ID for the LLM to use")
+    model_id: str = Field(default="Qwen2.5-72B-Instruct", description="Model ID for the LLM to use")
+    api_base: Optional[str] = Field(default=None, description="API base URL for the LLM")
     headless: bool = Field(False, description="Whether to run browser in headless mode")
     disable_security: bool = Field(True, description="Disable browser security features")
     extra_chromium_args: List[str] = Field(default_factory=list, description="Extra arguments to pass to the browser")
@@ -44,11 +45,12 @@ class BrowserToolConfig(BaseModel):
     max_length: int = Field(default=50000, description="Maximum character length for the content to be fetched")
 
 class DeepAnalyzerToolConfig(BaseModel):
-    analyzer_model_ids: List[str] = Field(default_factory=lambda: ["gemini-2.5-pro", "o3"], description="Model IDs for the LLMs to use")
-    summarizer_model_id: str = Field(default="gemini-2.5-pro", description="Model ID for the LLM to use")
+    analyzer_model_ids: List[str] = Field(default_factory=lambda: ["Qwen2.5-72B-Instruct"], description="Model IDs for the LLMs to use")
+    summarizer_model_id: str = Field(default="Qwen2.5-72B-Instruct", description="Model ID for the LLM to use")
+    converter_model_id: str = Field(default="Qwen2.5-72B-Instruct", description="Model ID for the MarkitdownConverter LLM to use")
 
 class AgentConfig(BaseModel):
-    model_id: str = Field(default="claude-4-sonnet",
+    model_id: str = Field(default="Qwen2.5-72B-Instruct", 
                           description="Model ID for the LLM to use")
     name: str = Field(default="agent", 
                       description="Name of the agent")
@@ -67,7 +69,7 @@ class HierarchicalAgentConfig(BaseModel):
     name: str = Field(default="agentscope", description="Name of the hierarchical agent")
     use_hierarchical_agent: bool = Field(default=True, description="Whether to use hierarchical agent")
     planning_agent_config: AgentConfig = Field(default_factory=lambda: AgentConfig(
-        model_id="claude-4-sonnet",
+        model_id="Qwen2.5-72B-Instruct",
         name="planning_agent",
         description="A planning agent that can plan the steps to complete the task.",
         max_steps=20,
@@ -76,7 +78,7 @@ class HierarchicalAgentConfig(BaseModel):
         managed_agents=["deep_analyzer_agent", "browser_use_agent", "deep_researcher_agent"],
     ))
     deep_analyzer_agent_config: AgentConfig = Field(default_factory=lambda: AgentConfig(
-        model_id="claude-4-sonnet",
+        model_id="Qwen2.5-72B-Instruct",
         name="deep_analyzer_agent",
         description="A team member that that performs systematic, step-by-step analysis of a given task, optionally leveraging information from external resources such as attached file or uri to provide comprehensive reasoning and answers. For any tasks that require in-depth analysis, particularly those involving attached file or uri, game, chess, computational tasks, or any other complex tasks. Please ask him for the reasoning and the final answer.",
         max_steps=3,
@@ -84,7 +86,7 @@ class HierarchicalAgentConfig(BaseModel):
         tools=["deep_analyzer", "python_interpreter"],
     ))
     browser_use_agent_config: AgentConfig = Field(default_factory=lambda: AgentConfig(
-        model_id="gpt-4.1",
+        model_id="Qwen2.5-72B-Instruct",
         name="browser_use_agent",
         description="A team member that can search the most relevant web pages and interact with them to find answers to tasks, specializing in precise information retrieval and accurate page-level interactions. Please ask this member to get the answers from the web when high accuracy and detailed extraction are required.",
         max_steps=5,
@@ -92,7 +94,7 @@ class HierarchicalAgentConfig(BaseModel):
         tools=["auto_browser_use", "python_interpreter"],
     ))
     deep_researcher_agent_config: AgentConfig = Field(default_factory=lambda: AgentConfig(
-        model_id="claude-4-sonnet",
+        model_id="Qwen2.5-72B-Instruct",
         name="deep_researcher_agent",
         description="A team member capable of conducting extensive web searches to complete tasks, primarily focused on retrieving broad and preliminary information for quickly understanding a topic or obtaining rough answers. For tasks that require precise, structured, or interactive page-level information retrieval, please use the `browser_use_agent`.",
         max_steps=3,
@@ -130,7 +132,7 @@ class Config(BaseModel):
     
     def init_config(self, config_path: "config.toml"):
         
-        with open(config_path, "r") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             config = toml.load(f)
             
         # General Config
@@ -154,7 +156,13 @@ class Config(BaseModel):
         # Tool Config
         self.searcher_tool = SearcherToolConfig(**config["searcher_tool"])
         self.deep_researcher_tool = DeepResearcherToolConfig(**config["deep_researcher_tool"])
-        self.browser_tool = BrowserToolConfig(**config["browser_tool"])
+        
+        # Handle browser_tool config, especially the nested proxy
+        browser_tool_config_dict = config["browser_tool"]
+        if "browser" in config and "proxy" in config["browser"]:
+            browser_tool_config_dict["proxy"] = config["browser"]["proxy"]
+        self.browser_tool = BrowserToolConfig(**browser_tool_config_dict)
+        
         self.deep_analyzer_tool = DeepAnalyzerToolConfig(**config["deep_analyzer_tool"])
 
         # Agent Config

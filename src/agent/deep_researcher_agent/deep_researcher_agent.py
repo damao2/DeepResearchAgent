@@ -24,7 +24,7 @@ from src.memory import (ActionStep,
 from src.logger import (LogLevel, 
                         YELLOW_HEX, 
                         logger)
-from src.models import Model, parse_json_if_needed, ChatMessage
+from src.models import Model, parse_json_if_needed
 from src.utils.agent_types import (
     AgentAudio,
     AgentImage,
@@ -145,7 +145,7 @@ class DeepResearcherAgent(AsyncMultiStepAgent):
             if isinstance(arguments, dict):
                 return await tool(**arguments) if is_managed_agent else await tool(**arguments, sanitize_inputs_outputs=True)
             elif isinstance(arguments, str):
-                return await tool(arguments) if is_managed_agent else await tool(arguments, sanitize_inputs_outputs=True)
+                return awaittool(arguments) if is_managed_agent else await tool(arguments, sanitize_inputs_outputs=True)
             else:
                 raise TypeError(f"Unsupported arguments type: {type(arguments)}")
 

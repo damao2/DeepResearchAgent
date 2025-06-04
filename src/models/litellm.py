@@ -1,9 +1,14 @@
 import warnings
+import json # Add json import
+import uuid # Add uuid import
+import re # Add re import
 from typing import Dict, List, Optional, Any
 
 from src.models.base import (ApiModel,
                              ChatMessage,
                              tool_role_conversions,
+                             ChatMessageToolCall, # Import ChatMessageToolCall
+                             ChatMessageToolCallDefinition # Import ChatMessageToolCallDefinition
                              )
 from src.models.message_manager import (
     MessageManager
@@ -74,6 +79,33 @@ class LiteLLMModel(ApiModel):
                 "Please install 'litellm' extra to use LiteLLMModel: `pip install 'smolagents[litellm]'`"
             ) from e
 
+        # Set global litellm API base and key if provided
+        if self.api_base:
+            litellm.api_base = self.api_base
+        if self.api_key:
+            litellm.api_key = self.api_key
+        
+        # Explicitly set global api_type to openai for custom OpenAI-compatible endpoints
+        # This might help litellm correctly identify the provider when api_base is custom
+        if self.api_base and "ai.gitee.com" in self.api_base:
+            litellm.api_type = "openai"
+
+            # Attempt to add model mapping for litellm
+            # This tells litellm that 'Qwen2.5-72B-Instruct' should be treated as an openai model
+            # with the specified api_base.
+            try:
+                litellm.add_model(
+                    "openai", # provider
+                    "Qwen2.5-72B-Instruct", # model name as used by the user
+                    api_base=self.api_base,
+                    api_key=self.api_key,
+                    api_type="openai"
+                )
+            except Exception as e:
+                # This might fail if the model is already added or due to other reasons.
+                # We'll just print a warning.
+                print(f"Warning: litellm.add_model failed: {e}")
+
         return litellm
 
     def _prepare_completion_kwargs(
@@ -88,6 +120,10 @@ class LiteLLMModel(ApiModel):
             timeout: Optional[int] = 300,
             **kwargs,
     ) -> Dict:
+        # Add debug prints for self.model_id and self.api_base
+        print(f"DEBUG (prepare_kwargs): self.model_id = {self.model_id}")
+        print(f"DEBUG (prepare_kwargs): self.api_base = {self.api_base}")
+
         """
         Prepare parameters required for model invocation, handling parameter priorities.
 
@@ -109,6 +145,7 @@ class LiteLLMModel(ApiModel):
             **self.kwargs,
             "messages": messages,
         }
+
         # Handle timeout
         if timeout is not None:
             completion_kwargs["timeout"] = timeout
@@ -125,13 +162,26 @@ class LiteLLMModel(ApiModel):
                 {
                     "tools": [self.message_manager.get_tool_json_schema(tool,
                                    model_id=self.model_id) for tool in tools_to_call_from],
-                    "tool_choice": "required",
+                    "tool_choice": "auto", # Changed from "required" to "auto"
                 }
             )
 
         # Finally, use the passed-in kwargs to override all settings
         completion_kwargs.update(kwargs)
         
+        # Special handling for Qwen2.5-72B-Instruct with ai.gitee.com
+        # Convert model_id to litellm's required format if it's the problematic one
+        # This must be done AFTER kwargs.update(kwargs) to ensure it's not overridden
+        if self.model_id == "Qwen2.5-72B-Instruct" and self.api_base and "ai.gitee.com" in self.api_base:
+            completion_kwargs["model"] = "openai/Qwen2.5-72B-Instruct"
+        else:
+            # Ensure model is set if not handled by special case
+            completion_kwargs["model"] = self.model_id
+
+
+        # Add debug print after kwargs update and special handling
+        print(f"DEBUG (prepare_kwargs): completion_kwargs['model'] after all updates = {completion_kwargs.get('model')}")
+
         if http_client:
             completion_kwargs['client'] = http_client
 
@@ -162,12 +212,126 @@ class LiteLLMModel(ApiModel):
             **kwargs,
         )
 
-        response = self.client.completion(**completion_kwargs)
+        # Explicitly pass model, api_base, api_key to litellm.completion
+        # This might help litellm correctly identify the provider
+        model_id_for_completion = completion_kwargs.pop("model")
+        api_base_for_completion = completion_kwargs.pop("api_base", None)
+        api_key_for_completion = completion_kwargs.pop("api_key", None)
+
+        # Add a print statement to debug the model_id
+        print(f"DEBUG: model_id_for_completion = {model_id_for_completion}")
+        #print(f"DEBUG: api_base_for_completion = {api_base_for_completion}")
+       # print(f"DEBUG: api_key_for_completion = {'<hidden>' if api_key_for_completion else 'None'}")
+       # print(f"DEBUG: remaining completion_kwargs = {completion_kwargs}")
+
+        response = self.client.completion(
+            model=model_id_for_completion,
+            api_base=api_base_for_completion,
+            api_key=api_key_for_completion,
+            api_type="openai", # Explicitly set api_type for custom OpenAI-compatible endpoints
+            **completion_kwargs
+        )
 
         self.last_input_token_count = response.usage.prompt_tokens
         self.last_output_token_count = response.usage.completion_tokens
+        # Extract message content and tool calls from the response
+        message_content = response.choices[0].message.content
+        message_tool_calls = response.choices[0].message.tool_calls
+
+        # Initialize ChatMessage with role and content
         first_message = ChatMessage.from_dict(
-            response.choices[0].message.model_dump(include={"role", "content", "tool_calls"}),
+            {"role": response.choices[0].message.role, "content": message_content},
             raw=response,
         )
+
+        # If litellm already parsed tool_calls, use them
+        if message_tool_calls:
+            first_message.tool_calls = []
+            for tool_call in message_tool_calls:
+                arguments = tool_call.function.arguments
+                if isinstance(arguments, str):
+                    try:
+                        arguments = json.loads(arguments)
+                    except json.JSONDecodeError:
+                        pass # If it's a string but not valid JSON, keep it as is or handle as error
+                first_message.tool_calls.append(
+                    ChatMessageToolCall(
+                        id=str(uuid.uuid4()),
+                        type="function",
+                        function=ChatMessageToolCallDefinition(
+                            name=tool_call.function.name,
+                            arguments=arguments,
+                        ),
+                    )
+                )
+        elif message_content and isinstance(message_content, str):
+            # Attempt to parse tool calls from content if tool_calls field is empty
+            # This handles cases where the model puts tool call info in the content string
+            try:
+                # Use regex to find a JSON object that looks like a tool call
+                # This regex looks for a JSON object containing "name" and "arguments" keys
+                # It's a heuristic and might need refinement based on actual model output patterns
+                tool_call_pattern = r"\{.*?\"name\":\s*\"([^\"]+)\".*?\"arguments\":\s*(\{.*?\})\}"
+                match = re.search(tool_call_pattern, message_content, re.DOTALL)
+
+                if match:
+                    tool_name = match.group(1)
+                    arguments_str = match.group(2)
+                    arguments = json.loads(arguments_str)
+
+                    first_message.tool_calls = [
+                        ChatMessageToolCall(
+                            id=str(uuid.uuid4()),
+                            type="function",
+                            function=ChatMessageToolCallDefinition(
+                                name=tool_name,
+                                arguments=arguments,
+                            ),
+                        )
+                    ]
+                    # Optionally, remove the tool call text from the content
+                    # This part is tricky as the content might contain other useful text
+                    # For now, let's keep the content as is, or set it to None if only tool call was present
+                    # If the entire content was just the tool call, clear it.
+                    if message_content.strip() == match.group(0).strip():
+                        first_message.content = None
+                    else:
+                        # Remove the matched tool call string from the content
+                        first_message.content = message_content.replace(match.group(0), "").strip()
+
+            except json.JSONDecodeError as e:
+                print(f"Warning: Could not parse tool call JSON from content string: {e}")
+            except Exception as e:
+                print(f"Warning: An unexpected error occurred while parsing tool call from content: {e}")
+
         return self.postprocess_message(first_message, tools_to_call_from)
+
+    def parse_tool_calls(self, raw_output: Any) -> List[ChatMessageToolCall]: # Change return type
+        """
+        Parses tool calls from the raw output of the LiteLLM model.
+        This method is required by the smolagents framework for tool call parsing.
+        """
+        tool_calls = []
+        # Check if tool_calls exist in the message object
+        if hasattr(raw_output.choices[0].message, 'tool_calls') and raw_output.choices[0].message.tool_calls:
+            for tool_call in raw_output.choices[0].message.tool_calls:
+                # Ensure tool_call.function.arguments is a dictionary
+                arguments = tool_call.function.arguments
+                if isinstance(arguments, str):
+                    try:
+                        arguments = json.loads(arguments)
+                    except json.JSONDecodeError:
+                        # If it's a string but not valid JSON, keep it as is or handle as error
+                        pass 
+
+                tool_calls.append(
+                    ChatMessageToolCall( # Use ChatMessageToolCall
+                        id=str(uuid.uuid4()), # Generate a unique ID
+                        type="function",
+                        function=ChatMessageToolCallDefinition( # Use ChatMessageToolCallDefinition
+                            name=tool_call.function.name,
+                            arguments=arguments,
+                        ),
+                    )
+                )
+        return tool_calls

@@ -245,31 +245,31 @@ class DeepResearcherTool(AsyncTool):
     }
     output_type = "any"
 
+    deep_researcher_config = config.deep_researcher_tool
+
+    max_depth = (
+        getattr(deep_researcher_config, "max_depth", 2)
+        if deep_researcher_config
+        else 5
+    )
+    max_insights = (
+        getattr(deep_researcher_config, "max_insights", 20)
+        if deep_researcher_config
+        else 20
+    )
+    time_limit_seconds = (
+        getattr(deep_researcher_config, "time_limit_seconds", 120)
+        if deep_researcher_config
+        else 120
+    )
+    max_follow_ups  = (
+        getattr(deep_researcher_config, "max_follow_ups", 3)
+        if deep_researcher_config
+        else 3
+    )
+
     def __init__(self):
-        self.deep_researcher_tool_config = config.deep_researcher_tool
-
-        self.max_depth = (
-            getattr(self.deep_researcher_tool_config, "max_depth", 2)
-            if self.deep_researcher_tool_config
-            else 5
-        )
-        self.max_insights = (
-            getattr(self.deep_researcher_tool_config, "max_insights", 20)
-            if self.deep_researcher_tool_config
-            else 20
-        )
-        self.time_limit_seconds = (
-            getattr(self.deep_researcher_tool_config, "time_limit_seconds", 120)
-            if self.deep_researcher_tool_config
-            else 120
-        )
-        self.max_follow_ups = (
-            getattr(self.deep_researcher_tool_config, "max_follow_ups", 3)
-            if self.deep_researcher_tool_config
-            else 3
-        )
-
-        self.model = model_manager.registed_models[self.deep_researcher_tool_config.model_id]
+        self.model = model_manager.registed_models[self.deep_researcher_config.model_id]
         self.web_searcher = WebSearcherTool()
         self.web_searcher.fetch_content = True # Enable content fetching
         super().__init__()
@@ -566,7 +566,7 @@ class DeepResearcherTool(AsyncTool):
         return insights
 
     async def _summary(self, query: str, reference_materials: str) -> str:
-        model = model_manager.registed_models["gpt-4o-search-preview"]
+        model = self.model # Use the agent's model
 
         messages = [
             {"role": "user", "content": query}

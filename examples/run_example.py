@@ -2,6 +2,8 @@ import warnings
 warnings.simplefilter("ignore", DeprecationWarning)
 
 import sys
+sys.stdin.reconfigure(encoding='utf-8')
+sys.stdout.reconfigure(encoding='utf-8')
 from pathlib import Path
 import asyncio
 

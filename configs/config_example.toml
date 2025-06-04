@@ -1,5 +1,5 @@
 # General Config
-tag = "example"
+tag = "gaia"
 concurrency = 4
 workdir = "workdir"
 log_path = "log.txt"
@@ -10,8 +10,8 @@ save_path = "dra.jsonl"
 
 # Tool Config
 [searcher_tool]
-engine = "Google"
-fallback_engines = ["DuckDuckGo", "Baidu", "Bing"]
+engine = "Bing"
+fallback_engines = ["Baidu"]
 retry_delay = 10
 max_retries = 3
 lang = "en"
@@ -22,14 +22,15 @@ fetch_content = false
 max_length = 50000
 
 [deep_researcher_tool]
-model_id = "gpt-4.1"
 max_depth = 2
 max_insights = 20
 time_limit_seconds = 60
 max_follow_ups = 3
+model_id = "Qwen2.5-72B-Instruct"
 
 [browser_tool]
-model_id = "gpt-4.1"
+model_id = "Qwen2.5-72B-Instruct"
+api_base = "https://ai.gitee.com/v1" # Replace with your actual Qwen API base
 headless = false
 disable_security = true
 extra_chromium_args = []
@@ -44,8 +45,9 @@ username = "xxxx"
 password = "xxxx"
 
 [deep_analyzer_tool]
-analyzer_model_ids = ["gemini-2.5-pro"]
-summarizer_model_id = "gemini-2.5-pro"
+analyzer_model_ids = ["Qwen2.5-72B-Instruct"]
+summarizer_model_id = "Qwen2.5-72B-Instruct"
+converter_model_id = "Qwen2.5-72B-Instruct"
 
 # Agent configs
 [agent]
@@ -53,7 +55,7 @@ name = "dra"
 use_hierarchical_agent = true
 
 [agent.planning_agent_config]
-model_id = "gpt-4.1"
+model_id = "Qwen2.5-72B-Instruct"
 name = "planning_agent"
 description = "A planning agent that can plan the steps to complete the task."
 max_steps = 20
@@ -62,7 +64,7 @@ tools = ["planning"]
 managed_agents = ["deep_analyzer_agent", "browser_use_agent", "deep_researcher_agent"]
 
 [agent.deep_analyzer_agent_config]
-model_id = "gpt-4.1"
+model_id = "Qwen2.5-72B-Instruct"
 name = "deep_analyzer_agent"
 description = "Performs systematic, step-by-step analysis..."
 max_steps = 3
@@ -70,7 +72,7 @@ template_path = "src/agent/deep_analyzer_agent/prompts/deep_analyzer_agent.yaml"
 tools = ["deep_analyzer", "python_interpreter"]
 
 [agent.browser_use_agent_config]
-model_id = "gpt-4.1"
+model_id = "Qwen2.5-72B-Instruct"
 name = "browser_use_agent"
 description = "Searches relevant web pages and interacts with them."
 max_steps = 5
@@ -78,7 +80,7 @@ template_path = "src/agent/browser_use_agent/prompts/browser_use_agent.yaml"
 tools = ["auto_browser_use", "python_interpreter"]
 
 [agent.deep_researcher_agent_config]
-model_id = "gpt-4.1"
+model_id = "Qwen2.5-72B-Instruct"
 name = "deep_researcher_agent"
 description = "Conducts extensive web searches."
 max_steps = 3

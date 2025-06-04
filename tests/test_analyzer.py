@@ -13,14 +13,14 @@ from src.models import model_manager
 from src.tools.deep_analyzer import DeepAnalyzerTool
 
 if __name__ == "__main__":
-    model_manager.init_models(use_local_proxy=True)
+    model_manager.init_models(use_local_proxy=False)
     
     deep_analyzer = DeepAnalyzerTool()
 
     task = """
-    If this whole pint is made up of ice cream, how many percent above or below the US federal standards for butterfat content is it when using the standards as reported by Wikipedia in 2020? Answer as + or - a number rounded to one decimal place.
+    Please analyze the attached file or uri and provide a detailed caption.
     """
 
-    response = asyncio.run(deep_analyzer.forward(task=task, source=os.path.join(root, "data/GAIA/2023/validation/b2c257e0-3ad7-4f05-b8e3-d9da973be36e.jpg")))
+    response = asyncio.run(deep_analyzer.forward(task=task, source=os.path.join(root, "data/GAIA/2023/validation/6359a0b1-8f7b-499b-9336-840f9ab90688.png")))
     
     print(response)

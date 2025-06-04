@@ -16,7 +16,7 @@ sys.path.append(root)
 
 from src.logger import logger
 from src.config import config
-from src.models import model_manager
+from src.registry import REGISTED_MODELS
 from src.agent import create_agent, prepare_response
 from src.dataset import HLEDataset
 from src.utils import assemble_project_path
@@ -73,7 +73,7 @@ async def answer_single_question(example, answers_file):
 
         agent_memory = await agent.write_memory_to_messages(summary_mode=True)
 
-        final_result = await prepare_response(augmented_question, agent_memory, reformulation_model=model_manager.registed_models["o3"])
+        final_result = await prepare_response(augmented_question, agent_memory, reformulation_model=REGISTED_MODELS["o3"])
 
         output = str(final_result)
         for memory_step in agent.memory.steps:
@@ -120,8 +120,7 @@ async def main():
     logger.info(f"Load config: {config}")
 
     # Registed models
-    model_manager.init_models(use_local_proxy=config.use_local_proxy)
-    logger.info("Registed models: %s", ", ".join(model_manager.registed_models.keys()))
+    logger.info("Registed models: %s", ", ".join(REGISTED_MODELS.keys()))
     
     # Load dataset
     dataset = HLEDataset(

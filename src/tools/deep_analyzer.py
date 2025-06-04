@@ -69,7 +69,7 @@ class DeepAnalyzerTool(AsyncTool):
 
         self.converter: MarkitdownConverter = MarkitdownConverter(
             use_llm=False,
-            model_id="gpt-4.1",
+            model_id=self.analyzer_config.converter_model_id, # Use model_id from config
             timeout=30,
         )
 

@@ -1,9 +1,7 @@
-
-
 from src.config import config
+from src.logger import logger
 from src.registry import REGISTED_AGENTS, REGISTED_TOOLS
 from src.models import model_manager
-from src.tools import make_tool_instance
 
 AUTHORIZED_IMPORTS = [
     "pandas",
@@ -41,8 +39,6 @@ def create_agent():
             )
             
             sub_agents.append(sub_agent)
-
-        sub_agent_tools = [make_tool_instance(agent) for agent in sub_agents]
         
         tool_ids = planning_agent_config.tools
         tools = []
@@ -50,14 +46,13 @@ def create_agent():
             if tool_id not in REGISTED_TOOLS:
                 raise ValueError(f"Tool ID '{tool_id}' is not registered.")
             tools.append(REGISTED_TOOLS[tool_id]())
-
-        tools = tools + sub_agent_tools
             
         agent = REGISTED_AGENTS["planning_agent"](
             config=planning_agent_config,
             model=model_manager.registed_models[planning_agent_config.model_id],
             tools=tools,
             max_steps=planning_agent_config.max_steps,
+            managed_agents=sub_agents,
             description=planning_agent_config.description,
             name=planning_agent_config.name,
             provide_run_summary=True,

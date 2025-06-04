@@ -22,14 +22,12 @@ fetch_content = false
 max_length = 50000
 
 [deep_researcher_tool]
-model_id = "gpt-4.1"
 max_depth = 2
 max_insights = 20
 time_limit_seconds = 60
 max_follow_ups = 3
 
 [browser_tool]
-model_id = "gpt-4.1"
 headless = false
 disable_security = true
 extra_chromium_args = []

@@ -32,7 +32,7 @@ class AgentLogger(logging.Logger, metaclass=Singleton):
         # Define a formatter for log messages
         self.formatter = logging.Formatter(
             fmt="\033[92m%(asctime)s - %(name)s:%(levelname)s\033[0m: %(filename)s:%(lineno)s - %(message)s",
-            datefmt="%H:%M:%S",
+            datefmt="%Y-%m-%d %H:%M:%S",
         )
 
     def init_logger(self, log_path: str, level=logging.INFO):
@@ -46,21 +46,22 @@ class AgentLogger(logging.Logger, metaclass=Singleton):
         """
 
         # Add a console handler for logging to the console
-        console_handler = logging.StreamHandler()
+        console_handler = logging.StreamHandler() # Removed encoding
         console_handler.setLevel(level)
         console_handler.setFormatter(self.formatter)
         self.addHandler(console_handler)
 
         # Add a file handler for logging to the file
         file_handler = logging.FileHandler(
-            log_path, mode="a"
+            log_path, mode="a", encoding="utf-8" # Add encoding
         )  # 'a' mode appends to the file
         file_handler.setLevel(level)
         file_handler.setFormatter(self.formatter)
         self.addHandler(file_handler)
 
         self.console = Console(width=100)
-        self.file_console = Console(file=open(log_path, "a"), width=100)
+        # Re-open the file with utf-8 encoding for file_console
+        self.file_console = Console(file=open(log_path, "a", encoding="utf-8"), width=100) # Add encoding
 
         # Prevent duplicate logs from propagating to the root logger
         self.propagate = False

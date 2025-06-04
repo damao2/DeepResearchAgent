@@ -1,4 +1,5 @@
 from src.tools.tools import AsyncTool, ToolResult
+from typing import Any
 
 
 class FinalAnswerTool(AsyncTool):
@@ -8,7 +9,7 @@ class FinalAnswerTool(AsyncTool):
         "type": "object",
         "properties": {
             "answer": {
-                "type": "string",
+                "type": "any",
                 "description": "The final answer to the problem.",
             },
         },
@@ -16,7 +17,7 @@ class FinalAnswerTool(AsyncTool):
     }
     output_type = "any"
 
-    async def forward(self, answer: str) -> ToolResult:
+    async def forward(self, answer: Any) -> ToolResult:
         result = ToolResult(
             output=answer,
             error=None,

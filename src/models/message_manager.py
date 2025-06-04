@@ -12,7 +12,6 @@ UNSUPPORTED_STOP_MODELS = [
     'claude37-sonnet',
     'o4-mini',
     'o3',
-    'langchain-o3'
 ]
 UNSUPPORTED_TOOL_CHOICE_MODELS = [
     'claude37-sonnet',

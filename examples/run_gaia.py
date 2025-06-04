@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 import pandas as pd
 from typing import List
+import threading
 import json
 from datetime import datetime
 import asyncio
@@ -16,7 +17,7 @@ sys.path.append(root)
 
 from src.logger import logger
 from src.config import config
-from src.models import model_manager
+from src.registry import REGISTED_MODELS
 from src.metric import question_scorer
 from src.agent import create_agent, prepare_response
 from src.dataset import GAIADataset
@@ -62,13 +63,8 @@ def get_tasks_to_run(answers_file, dataset) -> List[dict]:
             logger.info("Filtering answers starting.")
             filter_answers(answers_file)
             logger.info("Filtering answers ending.")
-
-            df = pd.read_json(answers_file, lines=True)
-            if "task_id" not in df.columns:
-                logger.warning(f"Answers file {answers_file} does not contain 'task_id' column. "
-                               "Please check the file format.")
-                return []
-            done_questions = df["task_id"].tolist()
+            
+            done_questions = pd.read_json(answers_file, lines=True)["task_id"].tolist()
             logger.info(f"Found {len(done_questions)} previous results!")
             
         else:
@@ -85,7 +81,7 @@ async def answer_single_question(example, answers_file):
 
     logger.info(f"Task Id: {example['task_id']}, Final Answer: {example['true_answer']}")
 
-    augmented_question = example["question"]
+    question = example["question"]
 
     if example["file_name"]:
 
@@ -93,16 +89,16 @@ async def answer_single_question(example, answers_file):
         file_description = f" - Attached file: {example['file_name']}"
         prompt_use_files += file_description
 
-        augmented_question += prompt_use_files
+        question += prompt_use_files
 
     start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     try:
         # Run agent 🚀
-        final_result = await agent.run(task=augmented_question)
+        final_result = await agent.run(task=question)
 
         agent_memory = agent.write_memory_to_messages(summary_mode=True)
 
-        final_result = await prepare_response(augmented_question, agent_memory, reformulation_model=model_manager.registed_models["o3"])
+        final_result = prepare_response(question, agent_memory, reformulation_model=REGISTED_MODELS["o3"])
 
         output = str(final_result)
         for memory_step in agent.memory.steps:
@@ -150,8 +146,7 @@ async def main():
     logger.info(f"Load config: {config}")
 
     # Registed models
-    model_manager.init_models(use_local_proxy=config.use_local_proxy)
-    logger.info("Registed models: %s", ", ".join(model_manager.registed_models.keys()))
+    logger.info("Registed models: %s", ", ".join(REGISTED_MODELS.keys()))
     
     # Load dataset
     dataset = GAIADataset(
@@ -165,7 +160,7 @@ async def main():
     tasks_to_run = get_tasks_to_run(config.save_path, dataset)
     logger.info(f"Loaded {len(tasks_to_run)} tasks to run.")
     
-    # # Run tasks
+    # Run tasks
     batch_size = getattr(config, "concurrency", 4)
     for i in range(0, len(tasks_to_run), batch_size):
         batch = tasks_to_run[i:min(i + batch_size, len(tasks_to_run))]
